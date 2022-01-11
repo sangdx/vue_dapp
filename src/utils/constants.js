@@ -9,6 +9,9 @@ const NETWORK_URL = process.env.NETWORK_PROVIDER || '';
 
 export const BSC_CHAIN_ID = process.env.BSC_CHAIN_ID
 export const contract_address = process.env.STAKING_ADDRESS
+export const martket_address = process.env.MARTKETPLACE_ADDRESS
+export const nft_address = process.env.NFT_ADDRESS
+export const appNetworkId = process.env.APP_NETWORK_ID
 
 export const appNetwork = {
   [appNetworkName.BSC]: {
@@ -20,6 +23,9 @@ export const appNetwork = {
 
 export const getProvider = () => {
   return new Web3(process.env.NETWORK_PROVIDER || 'https://data-seed-prebsc-1-s1.binance.org:8545/');
+}
+export const getProviderLocal = () => {
+  return new Web3(process.env.NETWORK_PROVIDER_LOCAL);
 }
 
 export const getContractInstance = (

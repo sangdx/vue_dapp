@@ -25,6 +25,27 @@
             </div>
           </div>
         </div>
+        <div class="container">
+          <div class="row">
+            <div class="form-group col-4">
+              <button class="btn btn-danger" @click="mintNFT">Mint NFT</button>
+            </div>
+            <div class="form-group col-4">{{ newNFT }}</div>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="row">
+            <div class="form-group col-12">
+              <input type="text" v-model="sellObj.address" class="form-control" placeholder="Address nft...">
+              <input type="text" v-model="sellObj.tokenId" class="form-control" placeholder="Tokenid">
+              <input type="number" v-model="sellObj.price" class="form-control" placeholder="Price...">
+            </div>
+            <div class="form-group col-4">
+              <button class="btn btn-danger" @click="sellNFT">Sell NFT</button>
+            </div>
+          </div>
+        </div>
         <!-- <table class="table table-striped">
           <thead>
             <tr>
@@ -55,7 +76,7 @@
   import Test from '@/components/Test'
   import {mapState} from 'vuex'
   import { utils } from 'ethers';
-  import { getApproveTokenBuni, getApproveToken, contract_address } from '@/utils/constants';
+  import { getApproveTokenBuni, getApproveToken, contract_address, nft_address } from '@/utils/constants';
 
   export default {
     name: 'Homepage',
@@ -68,7 +89,13 @@
         ],
         isShow: true,
         stakeAmount: 0,
-        scanUrl: 'https://testnet.bscscan.com/tx/'
+        scanUrl: 'https://testnet.bscscan.com/tx/',
+        newNFT: {},
+        sellObj: {
+          address: '',
+          tokenId: 0,
+          price: 0
+        }
       }
     },
     components: {
@@ -83,7 +110,11 @@
         buniBalance: state => state.web3.balanceBUNI,
         currentBalance: state => state.web3.balance,
         txHash: state => state.web3.currentHash,
-        loading: state => state.web3.loading
+        loading: state => state.web3.loading,
+        martketContract: state => state.web3.martketContract,
+        myOffers: state => state.web3.myOffers,
+        NFTContract: state => state.web3.NFTContract,
+        orders: state => state.web3.orders
       }),
       buni() {
         return getApproveTokenBuni()
@@ -111,12 +142,46 @@
       },
       async userStake() {
         if (!this.stakeAmount) return
-        console.log(this.stakeAmount)
         await this.$store.dispatch('userStakeToken', { amount: this.stakeAmount, account: this.account});
+      },
+      async mintNFT() {
+        try {
+          console.log('HEREEEE');
+          const mint = await this.NFTContract.mint(this.account);
+          const a = await mint.wait();
+          console.log('min success', a);
+          this.newNFT = a;
+        } catch(err) {
+          console.log('Min err', err)
+        }
+      },
+      sellNFT() {
+        const params = {
+          ver: 721,
+          address: this.sellObj.address,
+          tokenId: this.sellObj.tokenId,
+          unit: this.account,
+          openPrice: this.sellObj.price,
+          closePrice: 1,
+          startTime: new Date('2021-01-11 01:00:00').getTime(),
+          duration: 0,
+          keep: false,
+          account: this.account
+        }
+        this.$store.dispatch('sellNFT', params);
       }
     },
     async mounted() {
       await this.$store.dispatch('initialize');
+      await this.$store.dispatch('getMartketPlaceContract', this.account);
+      await this.$store.dispatch('martketOrders', this.account);
+      // await this.$store.dispatch('getNFTContract');
+      // await this.$store.dispatch('martketOffers');
+      // console.log(this.martketContract, '>>>m');
+      // console.log(this.NFTContract, '>>>nft');
+      // await this.mintNFT();
+      // await this.sellNFT();
+      console.log(this.orders, '>>>>>///oooo')
     }
   }
 </script>

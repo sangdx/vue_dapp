@@ -1,6 +1,8 @@
 import { ethers, BigNumber, utils } from "ethers";
 import StakingPool from "@/utils/Staking/index.json";
 import ERC20_ABI from "@/utils/Staking/ERC20_abi.json";
+import MartketPlace from "@/utils/Staking/MartketPlace.json";
+import NFT from "@/utils/Staking/NFT.json";
 
 import {
   appNetworkName,
@@ -8,15 +10,19 @@ import {
   appNetwork,
   getProvider,
   contract_address,
+  martket_address,
   getApproveToken,
   getContractInstance,
   getApproveTokenBuni,
-  getContract
+  getContract,
+  getProviderLocal,
+  appNetworkId
 } from '@/utils/constants'
 
 const BaseNetwork = appNetwork[appNetworkName.BSC];
 const { ethereum } = window;
 const web3 = getProvider();
+const web3Local = appNetworkId === BSC_CHAIN_ID ? web3 : getProviderLocal();
 
 const BlockchainProvider = {
   state: {
@@ -31,7 +37,13 @@ const BlockchainProvider = {
     balance: localStorage.getItem('account_balance') || 0,
     balanceBUNI: localStorage.getItem('account_balance_buni') || 0,
     currentHash: '',
-    loading: false
+    loading: false,
+    martketContract: {},
+    martketOffers: [],
+    appNetworkId: appNetworkId,
+    myOffers: [],
+    NFTContract: {},
+    orders: []
   },
   mutations: {
     setAccount(state, account) {
@@ -54,17 +66,41 @@ const BlockchainProvider = {
     },
     setLoading(state, loading) {
       state.loading = loading
+    },
+    setMartketContract(state, contract) {
+      state.martketContract = contract
+    },
+    setMartketOffer(state, martketOffers) {
+      state.martketOffers = martketOffers
+    },
+    setAppNetworkId(state, appNetworkId) {
+      state.appNetworkId = appNetworkId
+    },
+    setMyOffers(state, myOffers) {
+      state.myOffers = myOffers
+    },
+    setNFTContract(state, contract) {
+      state.NFTContract = contract
+    },
+    setOrder(state, order) {
+      state.orders = order
     }
   },
   actions: {
-    async initialize({ commit, dispatch }) {
+    async initialize({ commit, dispatch, state }) {
       const account = await dispatch("checkIfConnected")
       if (account) {
         localStorage.setItem('account', account);
         await dispatch('userStaking', account);
         await dispatch('getBalance', account);
         await dispatch('getBalanceBuni', account);
+        await dispatch('getNFTContract', account);
         commit('setAccount', account);
+        const address = NFT.networks[state.appNetworkId].address
+        const contractNFT = getContract(address, NFT.abi, account);
+        contractNFT.on('Transfer', (address, to, tokenId) => {
+          console.log('>>>>>>>>>>>Transfer>>>>>', address, to, tokenId)
+        });
       }
     },
     async connect({ commit, dispatch }, connect) {
@@ -137,6 +173,32 @@ const BlockchainProvider = {
         return null;
       }
     },
+    async getMartketPlaceContract({ commit, state }, account) {
+      try {
+        const address = MartketPlace.networks[state.appNetworkId].address
+        const contract = getContract(address, MartketPlace.abi, account);
+        commit('setMartketContract', contract);
+        return contract;
+      } catch (error) {
+        console.log(error);
+        console.log("connected contract not found");
+        return null;
+      }
+    },
+    async getNFTContract({ commit, state }, account) {
+      try {
+        const address = NFT.networks[state.appNetworkId].address
+        console.log(account, state.appNetworkId, '>>>>>>>>>>>>>>>>>>>>>,,,')
+        const NFTContract = getContract(address, NFT.abi, account);
+        console.log(NFTContract)
+        commit('setNFTContract', NFTContract);
+        return NFTContract;
+      } catch (error) {
+        console.log(error);
+        console.log("connected contract not found");
+        return null;
+      }
+    },
     async setupEventListeners({ commit, dispatch }) {
       try {
         const connectedContract = await dispatch('getContract');
@@ -194,6 +256,61 @@ const BlockchainProvider = {
         await dispatch('userStaking', account);
       } catch (error) {
         console.log('usertakeToken:::::', error);
+      }
+    },
+    async martketOffers({ commit, dispatch }) {
+      try {
+        commit('setLoading', true)
+        const connectedContract = await dispatch('getMartketPlaceContract');
+        if (!connectedContract) return;
+        const transaction = await connectedContract.methods.getOffers().call();
+        commit('setLoading', false);
+        console.log('Offerrrr :::::', transaction)
+      } catch (error) {
+        console.log('Martket offers:::::', error);
+      }
+    },
+    async martketOrders({ commit, dispatch }, account) {
+      try {
+        commit('setLoading', true)
+        const connectedContract = await dispatch('getMartketPlaceContract', account);
+        if (!connectedContract) return;
+        const transaction = await connectedContract.getOrder();
+        commit('setLoading', false);
+        const orders = transaction.map(trans => ({ ct: trans[1], tokenId: BigNumber.from(trans[2]._hex).toNumber(), ver: BigNumber.from(trans[0]._hex).toNumber()}))
+        commit('setOrder', orders);
+        console.log('order :::::', transaction)
+      } catch (error) {
+        console.log('Martket offers:::::', error);
+      }
+    },
+    async martketMyOffers({ commit, dispatch }, account) {
+      try {
+        commit('setLoading', true)
+        const connectedContract = await dispatch('getNFTContract');
+        if (!connectedContract) return;
+        const transaction = await connectedContract.methods.myOffers(account, 10).call();
+        commit('setLoading', false);
+        console.log(transaction, '>>>>>>..sell')
+        // commit('setMyOffers', transaction);
+      } catch (error) {
+        console.log('Martket offers:::::', error);
+      }
+    },
+    async sellNFT({ commit, dispatch }, params) {
+      try {
+        commit('setLoading', true)
+        const connectedContract = await dispatch('getMartketPlaceContract', params.account);
+        if (!connectedContract) return;
+        const {ver, address, tokenId, unit, openPrice, closePrice, startTime, duration, keep} = params
+        const transaction = await connectedContract.sell(ver, address, tokenId, unit, openPrice, closePrice, startTime, duration, keep)
+        const b = await transaction.wait();
+        console.log(b , '>>>>>>>b')
+        commit('setLoading', false);
+        // commit('setMyOffers', transaction);
+      } catch (error) {
+        commit('setLoading', false);
+        console.log('Martket sell:::::', error);
       }
     },
   }
