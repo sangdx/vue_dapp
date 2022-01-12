@@ -33,6 +33,13 @@
             <div class="form-group col-4">{{ newNFT }}</div>
           </div>
         </div>
+        <div class="container">
+          <div class="row">
+            <div class="form-group col-4">
+              <button class="btn btn-danger" @click="approveNFT">approveNFT</button>
+            </div>
+          </div>
+        </div>
 
         <div class="container">
           <div class="row">
@@ -169,6 +176,12 @@
           account: this.account
         }
         this.$store.dispatch('sellNFT', params);
+      },
+      async approveNFT() {
+        const martketAddress = '0x29cF5B06d4586E7546C37F8cf6c41758EB48933d';
+        const approve = await this.NFTContract.approve(martketAddress, 1);
+        const approved = await approve.wait();
+        console.log('min success', approved);
       }
     },
     async mounted() {
